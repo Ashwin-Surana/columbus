@@ -9,15 +9,43 @@ import azure.functions as func
 
 class HttpRequestParser(ABC):
 
+    def __init__(self):
+        self.context = None
+
     @abstractmethod
-    def parse_request(self):
+    def get_method(self):
         pass
+
+    @abstractmethod
+    def get_path(self):
+        pass
+
+    @abstractmethod
+    def get_mimetype(self):
+        pass
+
+    @abstractmethod
+    def get_params(self):
+        pass
+
+    @abstractmethod
+    def get_body(self):
+        pass
+
+    @abstractmethod
+    def get_headers(self):
+        pass
+
+    @abstractmethod
+    def parse_request(self) -> HttpRequest:
+        return HttpRequest(self.get_method(), self.get_path(), self.get_params(),
+                           self.get_body(), self.get_headers(), self.get_mimetype(), self.context)
 
 
 class AWSHttpParser(HttpRequestParser, ABC):
     def __init__(self, event, context):
+        super().__init__(context)
         self.event = event
-        self.context = context
 
     def get_method(self):
         return HTTPMethod[self.event['httpMethod']]
@@ -74,9 +102,30 @@ class AWSHttpParser(HttpRequestParser, ABC):
 
 
 class AzureHttpParser(HttpRequestParser, ABC):
+    def __init__(self, context: func.HttpRequest):
+        super().__init__(context)
+
+    def get_method(self):
+        return HTTPMethod[self.context.method()]
+
+    def get_path(self):
+        return self.context.url()
+
+    def get_params(self):
+        return self.context.params()
+
+    def get_body(self):
+        return self.context.get_json()
+
+    def get_headers(self):
+        return self.context.headers
+
+    def get_mimetype(self):
+        return self.context.headers.get('Content-Type', '')
 
     def parse_request(self) -> HttpRequest:
-        pass
+        return HttpRequest(self.get_method(), self.get_path(), self.get_params(),
+                           self.get_body(), self.get_headers(), self.get_mimetype(), self.context)
 
 
 class HTTPResponseParser(ABC):
