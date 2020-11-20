@@ -1,9 +1,9 @@
-import json
 from typing import Tuple, Set
 from columbus.exceptions import *
-from columbus.interceptors import Interceptor
+from columbus.interceptors import Interceptor, AuthInterceptor
 from columbus.models import *
-from columbus.parser import LambdaRequestParser
+from columbus.parser import AWSHttpParser
+import config as CONFIG
 
 
 class Route:
@@ -14,8 +14,6 @@ class Route:
     ):
         self.path = path
         self.methods = methods
-
-    
 
 
 class Router:
@@ -54,31 +52,40 @@ class Router:
     def get_router(self):
         def request_handler(event, context):
             response = HttpResponse()
-            req_parser = LambdaRequestParser(event)
-            request = req_parser.get_request()
+
+            # choose request parser
+            req_parser = AWSHttpParser(event)
+
+            request = req_parser.parse_request()  # return http request
 
             try:
                 for _filter in self.__filters:
                     filter_context = _filter.filter(event, response)
                     if filter_context is not None:
                         request.add_context(*filter_context)
+                #
+                # handler = self.get_handler(request.get_method(), request.get_path())
+                # res = handler(request)
 
-                handler = self.get_handler(request.get_method(), request.get_path())
-                res = handler(request)
-
-                if isinstance(res, HttpResponse):
-                    response.add_headers(res.headers)
-                    response.set_body(res.body)
-                    response.set_status(res.status)
-                else:
-                    response.set_body(json.dumps(res))
-
-            except HttpException as e:
-                response = HttpResponse(body=e.msg, status=e.status)
-
-            except Exception as e:
-                response = HttpResponse(body=str(e), status=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-            return response.as_dict()
+            #     if isinstance(res, HttpResponse):
+            #         response.add_headers(res.headers)
+            #         response.set_body(res.body)
+            #         response.set_status(res.status)
+            #     else:
+            #         response.set_body(json.dumps(res))
+            #
+            # except HttpException as e:
+            #     response = HttpResponse(body=e.msg, status=e.status)
+            #
+            # except Exception as e:
+            #     response = HttpResponse(body=str(e), status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            #
+            # return response.as_dict()
 
         return request_handler
+
+
+class CloudAuthRouter(Router):
+    def __init__(self):
+        super().__init__()
+        self.with_filter(AuthInterceptor(CONFIG.AUTH_SECRET, CONFIG.BEARER))
