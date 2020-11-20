@@ -25,25 +25,27 @@ class AuthInterceptor(Interceptor):
 
     def __verify_bearer_and_token(self, token):
         decoded_data = self.authorizer.decode_auth(token)
-
         if isinstance(decoded_data, str):
             raise Exception(decoded_data)
-        else:
-            return decoded_data
+        return decoded_data
 
     def on_request(self, request: HttpRequest):
-        #auth_token = request.get_header('Authorization')
+        # auth_token = request.get_header('Authorization')
 
         sample_auth = 'BEARER eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2MDU5NzMzNDYsImlhdCI6MTYwNTg4Njk0Niwic3ViIjoxMn0.OOpxHRNi_S_yAgkpG5S-MSpQy5PKsQap_IPBaTGlm_0'
 
         bearer, token = sample_auth.split(' ')
         if self.authorizer.bearer != bearer:
             raise Exception('ERROR ::: BEARER doesnt match')
-        else:
-            decoded = self.__verify_bearer_and_token(token)
-            return decoded
 
     def on_response(self, request: HttpRequest, response: HttpResponse):
+        sample_auth = 'BEARER eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2MDU5NzMzNDYsImlhdCI6MTYwNTg4Njk0Niwic3ViIjoxMn0.OOpxHRNi_S_yAgkpG5S-MSpQy5PKsQap_IPBaTGlm_0'
+        try:
+            bearer, token = sample_auth.split(' ')
+            decoded = self.__verify_bearer_and_token(token)
+            return 'userinfo', decoded
+        except Exception as e:
+            raise Exception('Error while decoding auth')
 
 
 class CORSInterceptor(Interceptor):
@@ -71,14 +73,16 @@ class CORSInterceptor(Interceptor):
             raise MethodNotAllowed('%s method not allowed' % request.get_method())
 
     def on_response(self, request: HttpRequest, response: HttpResponse):
-        response.headers.update(self.headers)
+        headers = {}
+        headers.update(response.headers)
+        headers.update(self.headers)
+        return headers
 
 
 class LogInterceptor(Interceptor):
     def __init__(self, logger: Logger):
         self.log = logger
 
-    def filter(self, event, response):
-        request = LambdaRequestParser(event).get_request()
+    def on_request(self, request: HttpRequest):
         self.log.info(
             '{}: {}  Params: {}'.format(request.get_method(), request.get_path(), str(request.get_all_params())))
