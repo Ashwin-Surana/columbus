@@ -4,13 +4,14 @@ from urllib.parse import parse_qs
 from columbus.models import HTTPMethod, HttpRequest, HttpResponse
 from columbus.structures import CaseInsensitiveDict
 from requests_toolbelt.multipart import decoder
+from http import HTTPStatus
 import azure.functions as func
 
 
 class HttpRequestParser(ABC):
 
-    def __init__(self):
-        self.context = None
+    def __init__(self, context):
+        self.context = context
 
     @abstractmethod
     def get_method(self):
@@ -36,7 +37,6 @@ class HttpRequestParser(ABC):
     def get_headers(self):
         pass
 
-    @abstractmethod
     def parse_request(self) -> HttpRequest:
         return HttpRequest(self.get_method(), self.get_path(), self.get_params(),
                            self.get_body(), self.get_headers(), self.get_mimetype(), self.context)
@@ -96,10 +96,6 @@ class AWSHttpParser(HttpRequestParser, ABC):
             return result
         return None
 
-    def parse_request(self) -> HttpRequest:
-        return HttpRequest(self.get_method(), self.get_path(), self.get_params(),
-                           self.get_body(), self.get_headers(), self.get_mimetype(), self.context)
-
 
 class AzureHttpParser(HttpRequestParser, ABC):
     def __init__(self, context: func.HttpRequest):
@@ -123,15 +119,76 @@ class AzureHttpParser(HttpRequestParser, ABC):
     def get_mimetype(self):
         return self.context.headers.get('Content-Type', '')
 
-    def parse_request(self) -> HttpRequest:
-        return HttpRequest(self.get_method(), self.get_path(), self.get_params(),
-                           self.get_body(), self.get_headers(), self.get_mimetype(), self.context)
-
 
 class HTTPResponseParser(ABC):
 
-    def parse_response(self) -> HttpResponse:
+    @abstractmethod
+    def get_body(self):
         pass
+
+    @abstractmethod
+    def get_status(self):
+        pass
+
+    @abstractmethod
+    def get_mimetype(self):
+        pass
+
+    @abstractmethod
+    def get_headers(self):
+        pass
+
+    @abstractmethod
+    def get_charset(self):
+        pass
+
+    def parse_response(self) -> HttpResponse:
+        return HttpResponse(self.get_body(), self.get_status(), self.get_headers(), self.get_mimetype(), self.get_charset())
+
+
+class AWSResponseParser(HTTPResponseParser, ABC):
+    def __init__(self, body=None, headers={}):
+        self.body = body
+        self.headers = headers
+        self.status = HTTPStatus.OK
+
+    def get_body(self):
+        return self.body
+
+    def get_headers(self):
+        return self.headers
+
+    def add_headers(self, headers):
+        self.headers.update(headers)
+
+    def get_status(self):
+        return HTTPStatus.OK
+
+    def get_mimetype(self):
+        return 'application/json'
+
+    def get_charset(self):
+        return None
+
+
+class AzureResponseParser(HTTPResponseParser, ABC):
+    def __init__(self, req: func.HttpResponse):
+        self.req = req
+
+    def get_body(self):
+        return self.req.get_body
+
+    def get_headers(self):
+        return self.req.headers
+
+    def get_status(self):
+        return self.req.status_code
+
+    def get_mimetype(self):
+        return self.req.mimetype
+
+    def get_charset(self):
+        return self.req.charset
 
 
 class LambdaRequestParser:
