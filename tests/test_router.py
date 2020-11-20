@@ -1,6 +1,7 @@
 from unittest import TestCase
 
-from columbus.router import Router, HttpRequest
+from columbus.models import HttpResponse
+from columbus.router import Router, HttpRequest, CloudAuthRouter
 
 
 class TestRouter(TestCase):
@@ -360,13 +361,13 @@ class TestRouter(TestCase):
 
     def test_aws_parser(self):
         event = {
-            "resource": "/ping/{id}",
-            "path": "/ping/12/",
-            "httpMethod": "POST",
+            "resource": "/ping",
+            "path": "/ping",
+            "httpMethod": "GET",
             "headers": {
                 "Accept": "*/*",
                 "Accept-Encoding": "gzip, deflate, br",
-                "Authorization": "GENIE hbnkfnukdnkdn",
+                "Authorization": "BEARER eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2MDU5NzMzNDYsImlhdCI6MTYwNTg4Njk0Niwic3ViIjoxMn0.OOpxHRNi_S_yAgkpG5S-MSpQy5PKsQap_IPBaTGlm_0",
                 "CloudFront-Forwarded-Proto": "https",
                 "CloudFront-Is-Desktop-Viewer": "true",
                 "CloudFront-Is-Mobile-Viewer": "false",
@@ -392,7 +393,7 @@ class TestRouter(TestCase):
                     "gzip, deflate, br"
                 ],
                 "Authorization": [
-                    "GENIE hbnkfnukdnkdn"
+                    ""
                 ],
                 "CloudFront-Forwarded-Proto": [
                     "https"
@@ -461,8 +462,8 @@ class TestRouter(TestCase):
             "stageVariables": None,
             "requestContext": {
                 "resourceId": "8uxtlx",
-                "resourcePath": "/ping/{id}",
-                "httpMethod": "POST",
+                "resourcePath": "/ping",
+                "httpMethod": "GET",
                 "extendedRequestId": "WSnrDECnIAMFV0Q=",
                 "requestTime": "20/Nov/2020:05:24:35 +0000",
                 "path": "/dev/ping/12/",
@@ -494,11 +495,13 @@ class TestRouter(TestCase):
         }
         app = CloudAuthRouter()
 
-        @app.get('test')
+        @app.get('/ping')
         def test_hello(req: HttpRequest):
             print(req.headers)
-            assert req.body == {}
-            assert req.headers == {}
-            assert req.params == {}
+            print(req.get_context('userinfo'))
+            # assert req.body == {}
+            # assert req.headers in {'Access-Control-Allow-Origin'}
+            # assert req.get_context('userinfo') == '12'
+            return "hello-world"
 
-        app.get_router()(event, None)
+        app.get_router()(event)

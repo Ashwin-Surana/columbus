@@ -21,7 +21,7 @@ class NoneType(object):
 class HttpResponse:
     def __init__(self, body=None, status: HTTPStatus = HTTPStatus.OK,
                  headers: Union[Mapping[str, str], NoneType] = None, mimetype: str = None,
-                 charset: str = None) -> object:
+                 charset: str = None):
         self.body = body
         self.status = status
         self.headers = headers

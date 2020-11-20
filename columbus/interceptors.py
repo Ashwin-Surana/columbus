@@ -5,7 +5,6 @@ from typing import Set
 from columbus.authorizer import Authorizer
 from columbus.exceptions import *
 from columbus.models import HTTPMethod, HttpRequest, HttpResponse
-from columbus.parser import LambdaRequestParser
 
 
 class Interceptor(ABC):
@@ -19,7 +18,7 @@ class Interceptor(ABC):
         pass
 
 
-class AuthInterceptor(Interceptor):
+class AuthInterceptor(Interceptor, ABC):
     def __init__(self, secret, bearer):
         self.authorizer = Authorizer(secret, bearer)
 
@@ -30,25 +29,23 @@ class AuthInterceptor(Interceptor):
         return decoded_data
 
     def on_request(self, request: HttpRequest):
-        # auth_token = request.get_header('Authorization')
+        auth_token = request.get_header('Authorization')
 
-        sample_auth = 'BEARER eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2MDU5NzMzNDYsImlhdCI6MTYwNTg4Njk0Niwic3ViIjoxMn0.OOpxHRNi_S_yAgkpG5S-MSpQy5PKsQap_IPBaTGlm_0'
-
-        bearer, token = sample_auth.split(' ')
+        bearer, token = auth_token.split(' ')
         if self.authorizer.bearer != bearer:
             raise Exception('ERROR ::: BEARER doesnt match')
 
     def on_response(self, request: HttpRequest, response: HttpResponse):
-        sample_auth = 'BEARER eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJleHAiOjE2MDU5NzMzNDYsImlhdCI6MTYwNTg4Njk0Niwic3ViIjoxMn0.OOpxHRNi_S_yAgkpG5S-MSpQy5PKsQap_IPBaTGlm_0'
+        auth_token = request.get_header('Authorization')
         try:
-            bearer, token = sample_auth.split(' ')
+            bearer, token = auth_token.split(' ')
             decoded = self.__verify_bearer_and_token(token)
             return 'userinfo', decoded
         except Exception as e:
             raise Exception('Error while decoding auth')
 
 
-class CORSInterceptor(Interceptor):
+class CORSInterceptor(Interceptor, ABC):
 
     def __init__(
             self,
@@ -73,13 +70,10 @@ class CORSInterceptor(Interceptor):
             raise MethodNotAllowed('%s method not allowed' % request.get_method())
 
     def on_response(self, request: HttpRequest, response: HttpResponse):
-        headers = {}
-        headers.update(response.headers)
-        headers.update(self.headers)
-        return headers
+        response.headers = self.headers
 
 
-class LogInterceptor(Interceptor):
+class LogInterceptor(Interceptor, ABC):
     def __init__(self, logger: Logger):
         self.log = logger
 
